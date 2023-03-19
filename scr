@@ -1,0 +1,97 @@
+#!/bin/sh
+# shellcheck disable=2237,2002
+
+# Author: nrv
+# License: gpl-3.0
+# Description: a minimalistic cross-display-server screenshot utility written in
+#              pure posix shell that wraps maim/grim and freezes the screen with
+#              sxiv/imv for selection (in selection mode)
+
+set -e
+
+: "${XDG_SESSION_TYPE:="tty"}"
+
+die() {
+  printf "%s: %s\n" "${0}" "${1}"
+  exit 1
+}
+
+usage() {
+  printf 'usage: %s [-s] [path]' "${0}"
+}
+
+select_cleanup() {
+  if ! [ -z "${select}" ]; then
+    rm -f "${temp_file}"
+    rm -f "${tmp_screenshot}"
+    kill -9 "${bg_pid}"
+  fi
+}
+
+# parse args
+select=
+while :; do
+  case "${1}" in
+    -s | --select) select=true ;;
+    *) break ;;
+  esac
+  shift
+done
+
+# init stuff
+date="$(date "+%Y-%m-%d_%H-%M-%S_%N")"
+pictures_dir="$(xdg-user-dir PICTURES)"
+pictures_dir="${pictures_dir:-"${HOME}/Pictures"}"
+screenshot_path="${1:-"${pictures_dir}/scr/${date}.png"}"
+
+# do the work
+case "${XDG_SESSION_TYPE}" in
+  wayland)
+    # if '-s' -- screenshot + open current screen state and prepare stuff
+    if ! [ -z "${select}" ]; then
+      temp_file="$(mktemp).png"
+      grim "${temp_file}"
+      imv -s 'crop' -f "${temp_file}" &
+      bg_pid="${!}"
+    fi
+
+    # then the main part - select region if needed and screenshot
+    # shellcheck disable=2237
+    ! [ -z "${select}" ] && { region="$(slurp 2>/dev/null)" || { select_cleanup && die 'selection failed/cancelled'; }; }
+    tmp_screenshot="$(mktemp).png"
+    if grim ${select:+'-g' "${region}"} "${tmp_screenshot}"; then
+      cat "${tmp_screenshot}" >"${screenshot_path}" &
+      cat "${tmp_screenshot}" | wl-copy -t 'image/png' &
+    fi
+
+    # always cleanup
+    select_cleanup
+    ;;
+  X11)
+    # if '-s' -- screenshot + open current screen state and prepare stuff
+    if ! [ -z "${select}" ]; then
+      temp_file="$(mktemp).png"
+      maim "${temp_file}"
+      sxiv -f -b "${temp_file}" &
+      bg_pid="${!}"
+    fi
+
+    # then the main part - select region if needed and screenshot
+    tmp_screenshot="$(mktemp).png"
+    if maim ${select:+"-s"} >"${tmp_screenshot}"; then
+      cat "${tmp_screenshot}" >"${screenshot_path}" &
+      cat "${tmp_screenshot}" | xclip -in -selection 'clipboard' -t 'image/png' &
+      exit_code=0
+    else
+      exit_code=1
+    fi
+
+    # always cleanup
+    select_cleanup
+    exit "${exit_code}"
+    ;;
+  tty)
+    die 'tty: not implemented'
+    ;;
+  *) ;;
+esac
