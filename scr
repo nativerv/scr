@@ -20,11 +20,10 @@ usage() {
   printf 'usage: %s [-s] [path]' "${0}"
 }
 
-select_cleanup() {
+cleanup() {
   if ! [ -z "${select}" ]; then
     rm -f "${temp_file}"
     rm -f "${tmp_screenshot}"
-    kill -9 "${bg_pid}"
   fi
 }
 
@@ -57,7 +56,7 @@ case "${XDG_SESSION_TYPE}" in
 
     # then the main part - select region if needed and screenshot
     # shellcheck disable=2237
-    ! [ -z "${select}" ] && { region="$(slurp 2>/dev/null)" || { select_cleanup && die 'selection failed/cancelled'; }; }
+    ! [ -z "${select}" ] && { region="$(slurp 2>/dev/null)" || { cleanup && die 'selection failed/cancelled'; }; }
     tmp_screenshot="$(mktemp).png"
     if grim ${select:+'-g' "${region}"} "${tmp_screenshot}"; then
       cat "${tmp_screenshot}" >"${screenshot_path}" &
@@ -65,7 +64,9 @@ case "${XDG_SESSION_TYPE}" in
     fi
 
     # always cleanup
-    select_cleanup
+    kill -9 "${bg_pid}"
+    wait
+    cleanup
     ;;
   X11)
     # if '-s' -- screenshot + open current screen state and prepare stuff
@@ -87,7 +88,9 @@ case "${XDG_SESSION_TYPE}" in
     fi
 
     # always cleanup
-    select_cleanup
+    kill -9 "${bg_pid}"
+    wait
+    cleanup
     exit "${exit_code}"
     ;;
   tty)
