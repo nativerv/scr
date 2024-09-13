@@ -50,7 +50,7 @@ case "${XDG_SESSION_TYPE}" in
     if ! [ -z "${select}" ]; then
       temp_file="$(mktemp).png"
       grim "${temp_file}"
-      imv -s 'crop' -f "${temp_file}" &
+      imv -w 'scr' -s 'crop' -f "${temp_file}" &
       bg_pid="${!}"
     fi
 
