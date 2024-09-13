@@ -7,7 +7,8 @@
 #              pure posix shell that wraps maim/grim and freezes the screen with
 #              sxiv/imv for selection (in selection mode)
 
-set -e
+set -u
+set -x
 
 : "${XDG_SESSION_TYPE:="tty"}"
 
@@ -30,7 +31,7 @@ cleanup() {
 # parse args
 select=
 while :; do
-  case "${1}" in
+  case "${1-}" in
     -s | --select) select=true ;;
     *) break ;;
   esac
