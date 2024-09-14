@@ -22,10 +22,11 @@ usage() {
 }
 
 cleanup() {
-  if ! [ -z "${select}" ]; then
+  if [ -n "${select}" ]; then
     rm -f "${temp_file}"
     rm -f "${tmp_screenshot}"
   fi
+  [ -n "${bg_pid-}" ] && kill -9 "${bg_pid}"
 }
 
 # parse args
@@ -56,17 +57,14 @@ case "${XDG_SESSION_TYPE}" in
     fi
 
     # then the main part - select region if needed and screenshot
-    # shellcheck disable=2237
-    ! [ -z "${select}" ] && { region="$(slurp 2>/dev/null)" || { cleanup && die 'selection failed/cancelled'; }; }
     tmp_screenshot="$(mktemp).png"
+    # shellcheck disable=2237
+    [ -n "${select}" ] && region="$(slurp 2>/dev/null)" || { cleanup && die 'selection failed/cancelled'; };
     if grim ${select:+'-g' "${region}"} "${tmp_screenshot}"; then
-      cat "${tmp_screenshot}" >"${screenshot_path}" &
-      cat "${tmp_screenshot}" | wl-copy -t 'image/png' &
+      cat "${tmp_screenshot}" | tee "${screenshot_path}" | wl-copy -t 'image/png'
     fi
 
     # always cleanup
-    kill -9 "${bg_pid}"
-    wait
     cleanup
     ;;
   X11)
@@ -81,16 +79,13 @@ case "${XDG_SESSION_TYPE}" in
     # then the main part - select region if needed and screenshot
     tmp_screenshot="$(mktemp).png"
     if maim ${select:+"-s"} >"${tmp_screenshot}"; then
-      cat "${tmp_screenshot}" >"${screenshot_path}" &
-      cat "${tmp_screenshot}" | xclip -in -selection 'clipboard' -t 'image/png' &
+      cat "${tmp_screenshot}" | tee "${screenshot_path}" | xclip -in -selection 'clipboard' -t 'image/png'
       exit_code=0
     else
       exit_code=1
     fi
 
     # always cleanup
-    kill -9 "${bg_pid}"
-    wait
     cleanup
     exit "${exit_code}"
     ;;
