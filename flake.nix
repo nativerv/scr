@@ -14,10 +14,6 @@
       "aarch64-darwin"
     ];
   in {
-    homeManagerModules = {
-      default = self.homeManagerModules.scr;
-      scr = import ./home-manager/modules/services/scr.nix { inherit self; };
-    };
     packages = forAllSystems (system: let
       pkgs = nixpkgs.legacyPackages.${system};
       inherit (pkgs) lib;
